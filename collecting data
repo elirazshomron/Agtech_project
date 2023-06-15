@@ -1,0 +1,59 @@
+import urllib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import matplotlib.dates as mdates
+from datetime import datetime, timedelta
+
+# define what to download
+channels = "2187009"
+fields = "1,2,3,4,5,6,7,8"
+
+# Calculate start and end times (6 PM yesterday to 6 PM today)
+now = datetime.now()
+start_time = datetime(now.year, now.month, now.day, 18, 0) - timedelta(days=1)
+end_time = datetime(now.year, now.month, now.day, 18, 0)
+
+start_time_str = start_time.strftime("%Y-%m-%d%%20%H:%M:%S")
+end_time_str = end_time.strftime("%Y-%m-%d%%20%H:%M:%S")
+
+# URL to fetch data from the last 24 hours
+url = f"https://api.thingspeak.com/channels/{channels}/fields/{fields}.csv?start={start_time_str}&end={end_time_str}"
+
+# Open the URL and get the response
+data = urllib.request.urlopen(url)
+# Read the response data
+d = data.read()
+
+# Save data to CSV
+filename1 = '/content/drive/MyDrive/faculty/year_3/agro-tech_lab/data_2023-06-13_18-00-00_to_2023-06-14_18-00-00.csv'
+file = open(filename1, "w")
+file.write(d.decode('UTF-8'))
+file.close()
+
+# Load data
+df = pd.read_csv(filename1)
+
+# Rename columns
+df = df.rename(columns={"created_at": "timestamp",
+                        "field1": "Temperature (°C)",
+                        "field2": "Altitude (m)",
+                        "field3": "Radiation Intensity  (W/m²)",
+                        "field4": "Latitude (rad)",
+                        "field5": "Wind Speed (m/sec)",
+                        "field6": "Pressure (kPa)",
+                        "field7": "Humidity (%)",
+                        "field8": "Elevation (m)",
+                        })
+
+# Set timestamp as index
+df['timestamp'] = pd.to_datetime(df['timestamp'])
+df = df.set_index('timestamp')
+
+# Plot all parameters
+#for column in df.columns:
+#    fig, ax = plt.subplots(1)
+#    ax.plot(df[column])
+#    ax.set(ylabel=column)
+#    plt.gcf().autofmt_xdate()  # makes slanted dates
+#    plt.show()
