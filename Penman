@@ -1,0 +1,41 @@
+!pip install pyet
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib
+import numpy as np
+import pandas as pd
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()  # datetime converter for a matplotlib
+sns.set(style="ticks", font_scale=1.5)
+import pyet
+
+df['Radiation Intensity  (W/m²)'] = np.where(df['Radiation Intensity  (W/m²)'] < 0, 0, df['Radiation Intensity  (W/m²)'])
+rad_sum=df['Radiation Intensity  (W/m²)'].sum()
+rad_sum=(rad_sum*0.0864)/1000 #convert from W to MJ
+
+# average day temperature [°C]
+tmean = df["Temperature (°C)"]
+wind =df['Wind Speed (m/sec)']
+# mean daily relative humidity [%]
+rh = df['Humidity (%)']
+# incoming solar radiation [MJ m-2 d-1]
+rs = df['Radiation Intensity  (W/m²)']
+pressure = df['Pressure (kPa)']
+elevation = df['Elevation (m)']
+# the site latitude [rad]
+latitude = pyet.deg_to_rad(32.0073)
+penm = pyet.combination.penman(tmean=tmean,
+                               wind=wind,
+                               pressure=pressure,
+                               elevation=elevation,
+                               rh=rh,
+                               rs=rs,
+                               lat=latitude,
+                              )
+    
+#since we want daily evapo                         
+penm=penm.sum()# the value here represent the evapo in mm
+
+
+                             
