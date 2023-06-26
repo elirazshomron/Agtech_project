@@ -18,3 +18,5 @@ Part A- Irrigation based on calculation:
 
 Part B - Irrigation based on real-time water availability:
 6. Using a soil moisture meter for the local opening of the solenoid upon crossing a lower threshold and closing upon reaching an upper threshold (on ESP).
+
+In the end we created a simple and cheap kit for controlled and efficient automatic watering of the garden or the plant on the balcony
