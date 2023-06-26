@@ -19,9 +19,15 @@ Part A- Irrigation based on calculation:
 4. Sending an 'Activate' message using the MQTT platform
 5. Receiving the message in the ESP and opening the solenoid for the calculated time
 
+   sensors(temp, rad and humid)--->ESP--->Thingspeaks--->Python--->MQTT--->ESP--->Solenoid
+
+
 Part B - Irrigation based on real-time water availability:
 
 6. Using a soil moisture meter for the local opening of the solenoid upon crossing a lower threshold and closing upon reaching an upper threshold (on ESP).
 
+   sensor(soil humidity)--->ESP--->Solenoid
 
-In the end we created a simple and cheap kit for controlled and efficient automatic watering of the garden or the plant on the balcony
+
+
+In the end we created a simple and cheap kit for controlled and efficient automatic watering of the garden or the plant on your balcony.
