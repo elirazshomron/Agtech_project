@@ -7,9 +7,12 @@ A computational PENMAN formula that returns the potential daily evapotranspirati
 This method does not necessarily reflect what is happening in the field in real-time.
 To this end, we also resorted to a direct measurement of soil moisture, which reflects in real-time the availability of water to the root system.
 
+
+
 The steps:
 
 Part A- Irrigation based on calculation:
+
 1. Collecting temperature, radiation, and relative humidity data (on ESP)
 2. Sending the data to Thingspeaks.
 3. Downloading the data and calculating the daily evaporation (Python)
@@ -17,6 +20,8 @@ Part A- Irrigation based on calculation:
 5. Receiving the message in the ESP and opening the solenoid for the calculated time
 
 Part B - Irrigation based on real-time water availability:
+
 6. Using a soil moisture meter for the local opening of the solenoid upon crossing a lower threshold and closing upon reaching an upper threshold (on ESP).
+
 
 In the end we created a simple and cheap kit for controlled and efficient automatic watering of the garden or the plant on the balcony
