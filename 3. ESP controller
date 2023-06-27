@@ -1,0 +1,217 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <Wire.h>
+#include <Adafruit_SHT31.h>
+#include <Adafruit_ADS1X15.h>
+#include "ThingSpeak.h"
+
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+
+const char* ssid = "Ron Tzur (2)";
+const char* password = "ron1251993";
+
+char* mqttServer = "broker.hivemq.com";
+int mqttPort = 1883;
+
+const int valvePin = 13;  // GPIO pin connected to the valve
+
+// SHT31 sensor
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
+#define SHT31_SCL_PIN 22
+#define SHT31_SDA_PIN 21
+
+// ADS1115 settings
+Adafruit_ADS1115 ads;  // Create an ADS1115 object
+#define ADS1115_SCL_PIN 22
+#define ADS1115_SDA_PIN 21
+const float conversionFactor = 0.015625;  // Conversion factor in mV
+
+// Moisture sensor pin
+const int moistureSensorPin = 34;
+
+// ThingSpeak settings
+unsigned long channelID = 2187009;
+const char* writeAPIKey = "1NNGNWS1BM7D16KZ";
+
+String msgString;    // Declare msgString variable in the global scope
+
+unsigned long previousThingSpeakTime = 0;  // Previous time for ThingSpeak upload
+unsigned long previousMQTTTime = 0;  // Previous time for MQTT handling
+const unsigned long thingSpeakInterval = 600000;  // Interval for ThingSpeak upload (10 minutes)
+const unsigned long mqttInterval = 10000;  // Interval for MQTT handling (10 seconds)
+
+void setupMQTT() {
+  mqttClient.setServer(mqttServer, mqttPort);
+  mqttClient.setCallback(callback);
+}
+
+void reconnect() {
+  Serial.println("Connecting to MQTT Broker...");
+  while (!mqttClient.connected()) {
+    Serial.println("Reconnecting to MQTT Broker...");
+    String clientId = "ESP32Client-";
+    clientId += String(random(0xffff), HEX);
+
+    if (mqttClient.connect(clientId.c_str())) {
+      Serial.println("Connected.");
+      mqttClient.subscribe("agrotech/2023/control");
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("Connected to Wi-Fi");
+
+  setupMQTT();
+
+  pinMode(valvePin, OUTPUT);
+  digitalWrite(valvePin, LOW);
+
+  Wire.begin(SHT31_SDA_PIN, SHT31_SCL_PIN);
+  if (!sht31.begin(0x44)) {
+    Serial.println("Couldn't find SHT31");
+    while (1) delay(1);
+  }
+
+  Wire.begin(ADS1115_SDA_PIN, ADS1115_SCL_PIN);
+  ads.setGain(GAIN_EIGHT);
+  if (!ads.begin()) {
+    Serial.println("Failed to initialize ADS.");
+    while (1);
+  }
+
+  ThingSpeak.begin(wifiClient);
+}
+
+void loop() {
+  if (!mqttClient.connected()) {
+    reconnect();
+  }
+
+  mqttClient.loop();
+
+  unsigned long currentMillis = millis();
+
+  // ThingSpeak data upload every 10 minutes
+  if (currentMillis - previousThingSpeakTime >= thingSpeakInterval) {
+    previousThingSpeakTime = currentMillis;
+    uploadThingSpeakData();
+  }
+
+  // MQTT handling every 10 seconds
+  if (currentMillis - previousMQTTTime >= mqttInterval) {
+    previousMQTTTime = currentMillis;
+    handleMQTT();
+  }
+}
+
+void uploadThingSpeakData() {
+  float t = sht31.readTemperature();
+  float h = sht31.readHumidity();
+
+  if (!isnan(t) && !isnan(h)) {
+    Serial.print("Temperature: ");
+    Serial.print(t);
+    Serial.println(" °C");
+
+    Serial.print("Humidity: ");
+    Serial.print(h);
+    Serial.println(" %");
+
+    int16_t adc0 = ads.readADC_Differential_0_1();
+    float volts0 = adc0 * conversionFactor;
+    float radiationIntensity = (volts0 * (1 / 260.0) * 1000.0);
+
+    Serial.print("Radiation Intensity: ");
+    Serial.print(radiationIntensity);
+    Serial.println(" W/m^2");
+
+    int moistureLevel = analogRead(moistureSensorPin);
+    Serial.print("Raw Moisture Level: ");
+    Serial.println(moistureLevel);
+
+    int min_value = 0;
+    int max_value = 1200;
+    float percentage = map(moistureLevel, min_value, max_value, 0, 100);
+    percentage = constrain(percentage, 0, 100);
+
+    Serial.print("Moisture Level: ");
+    Serial.print(percentage);
+    Serial.println("%");
+
+    float altitude = 1.0;
+    float latitude = 32.0073;
+    float windSpeed = 0;
+    float pressure = 101.325;
+    float elevation = 31.0;
+
+    Serial.print("Altitude: ");
+    Serial.print(altitude);
+    Serial.println(" m");
+    Serial.print("Latitude: ");
+    Serial.print(latitude);
+    Serial.println(" rad");
+    Serial.print("Wind Speed: ");
+    Serial.print(windSpeed);
+    Serial.println(" m/sec");
+    Serial.print("Pressure: ");
+    Serial.print(pressure);
+    Serial.println(" kPa");
+
+    ThingSpeak.setField(1, t);
+    ThingSpeak.setField(2, altitude);
+    ThingSpeak.setField(3, radiationIntensity);
+    ThingSpeak.setField(4, latitude);
+    ThingSpeak.setField(5, windSpeed);
+    ThingSpeak.setField(6, pressure);
+    ThingSpeak.setField(7, h);
+    ThingSpeak.setField(8, elevation);
+
+    int response = ThingSpeak.writeFields(channelID, writeAPIKey);
+
+    if (response == 200) {
+      Serial.println("Data sent to ThingSpeak!");
+    } else {
+      Serial.print("Error sending data to ThingSpeak. Response code: ");
+      Serial.println(response);
+    }
+
+    if (percentage < 30) {
+      digitalWrite(valvePin, LOW);
+      Serial.println("Valve opened");
+    } else {
+      digitalWrite(valvePin, HIGH);
+      Serial.println("Valve closed");
+    }
+  } else {
+    Serial.println("Failed to read temperature and humidity");
+  }
+}
+
+void handleMQTT() {
+  mqttClient.loop();
+}
+
+void callback(char* topic, byte* message, unsigned int length) {
+  // Convert byte array to string
+  msgString = String((char*)message, length);
+
+  Serial.print("Message: ");
+  Serial.println(msgString);
+
+  if (msgString == "open") {
+    digitalWrite(valvePin, LOW);  // Open the valve
+    Serial.println("Open the valve!");
+  } else if (msgString == "close") {
+    digitalWrite(valvePin, HIGH);   // Close the valve
+    Serial.println("Close the valve!");
+  }
+}
